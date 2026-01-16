@@ -11,12 +11,10 @@ List of Functions:
 """
 import requests
 import os
-from dotenv import load_dotenv
+from fbdsm.config import settings
 
-load_dotenv()
-
-BASE_URL = "https://knowunity-agent-olympics-2026-api.vercel.app"
-API_KEY = os.getenv("API_KEY")
+BASE_URL = settings.KNOWUNITY_API_URL
+API_KEY = settings.KNOWUNITY_API_KEY
 
 
 def get_students(set_type: str = "mini_dev"):

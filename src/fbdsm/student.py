@@ -3,7 +3,7 @@ import urllib.parse
 from pydantic import BaseModel
 from typing import Optional,List
 
-from f_bdsm.config import settings
+from fbdsm.config import settings
 
 class Topic(BaseModel):
     id: str

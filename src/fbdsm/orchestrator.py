@@ -1,5 +1,5 @@
-from f_bdsm.student import Student
-from f_bdsm.interaction_result import InteractionResult
+from fbdsm.student import Student
+from fbdsm.interaction_result import InteractionResult
 from typing import List
 
 class TutoringOrchestrator:
