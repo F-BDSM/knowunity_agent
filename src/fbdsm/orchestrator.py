@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from tqdm import tqdm
 import dspy
 from .student import Student
@@ -11,7 +11,6 @@ class TutoringOrchestrator:
 
     def __init__(self,student_id:str,max_turns:int=10):
         self.max_turns = max_turns
-        self._interactions: List[InteractionResult] = []
         self.student = Student(student_id)
         self.current_conversation_id: Optional[str] = None
         self.question_agent = QuestionAgent()
@@ -42,15 +41,12 @@ class TutoringOrchestrator:
             result = self.student.get_response(question)            
             self._messages.append({
                 "question": question,
-                "request": question_agent_input.model_dump()
+                "request": question_agent_input
             })
             self.current_conversation_id = result.conversation_id
             last_student_response = result.student_response
-
-            if result.turn_number == self.max_turns:
-                break
         
-        return self._interactions
+        return self._messages
 
     def get_all_topics(self,):
         pass
