@@ -6,20 +6,23 @@ List of Functions:
 - get_topics(subject_id)
 - start_conversation(student_id, topic_id)
 - interact(conversation_id, tutor_message)
-- submit_mse_predictions(student_id, topic_id, prediction_level)
+- submit_mse_predictions(predictions_dict)
 - evaluate_tutoring()
 """
 import requests
 import os
 from dotenv import load_dotenv
 
+
 load_dotenv()
+
 
 BASE_URL = "https://knowunity-agent-olympics-2026-api.vercel.app"
 API_KEY = os.getenv("API_KEY")
+SET_TYPE = "mini_dev"
 
 
-def get_students(set_type: str = "mini_dev"):
+def get_students(set_type: str = SET_TYPE):
     url = f"{BASE_URL}/students"
     params = {
         "set_type": set_type
@@ -47,7 +50,7 @@ def get_subjects():
     headers = {
         "accept": "application/json"
     }
-    response = requests.get(url, headers=headers, timeout=10)
+    response = requests.get(url, headers=headers)
     data = response.json()
 
     return data
@@ -55,10 +58,13 @@ def get_subjects():
 
 def get_topics(subject_id: str):
     url = f"{BASE_URL}/topics"
+    params = {
+        "subject_id": subject_id
+    }
     headers = {
         "accept": "application/json"
     }
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, params=params)
     data = response.json()
     return data
 
@@ -95,7 +101,10 @@ def interact(conversation_id: str, tutor_message: str):
     return data
 
 
-def submit_mse_predictions(student_id: str, topic_id: str, predicted_level: int, set_type: str = "mini_dev"):
+def submit_mse_predictions(predictions_dict: dict, set_type: str = SET_TYPE):
+    """
+    predictions_dict: dict of {(student_id, topic_id): predicted_level}
+    """
     url = f"{BASE_URL}/evaluate/mse"
     headers = {
         "accept": "application/json",
@@ -109,6 +118,7 @@ def submit_mse_predictions(student_id: str, topic_id: str, predicted_level: int,
                 "topic_id": topic_id,
                 "predicted_level": predicted_level,
             }
+            for (student_id, topic_id), predicted_level in predictions_dict.items()
         ],
         "set_type": set_type,
     }
@@ -117,7 +127,7 @@ def submit_mse_predictions(student_id: str, topic_id: str, predicted_level: int,
     return data
 
 
-def evaluate_tutoring(set_type: str = "mini_dev"):
+def evaluate_tutoring(set_type: str = SET_TYPE):
     url = f"{BASE_URL}/evaluate/tutoring"
     headers = {
         "accept": "application/json",
