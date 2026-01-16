@@ -26,9 +26,9 @@ class QuestionAgent:
         self.answer_history: List[str] = []
         self.generator = dspy.ChainOfThought(GenerateQuestion)
 
-    def generate(self, grade_level:str, topic:str, difficulty:str, previous_answers: Optional[List[str]] = None) -> dict:
+    def generate(self, grade_level:str, topic:str, difficulty:int, previous_answers: Optional[List[str]] = None) -> dict:
         
-        difficulty = {1:"very easy", 2:"easy", 3:"medium", 4:"hard", 5:"very hard"}
+        difficulty_mapping = {1:"very easy", 2:"easy", 3:"medium", 4:"hard", 5:"very hard"}
         """Generate a question, optionally based on previous answers."""
 
         answers = previous_answers or self.answer_history
@@ -37,7 +37,7 @@ class QuestionAgent:
         result = self.generator(
             grade_level=grade_level,
             topic=topic,
-            difficulty=difficulty,
+            difficulty=difficulty_mapping[difficulty],
             previous_answers=answers_str
         )
 
