@@ -10,11 +10,9 @@ from fbdsm.models import InteractionResult,Topic
 
 class Student:
 
-    def __init__(self,student_id:str,topic_id:str, grade_level:int, name:str):
+    def __init__(self,student_id:str,topic_id:Optional[str]=None):
         self.student_id:str = student_id
-        self.topic_id:str = topic_id
-        self.grade_level:int = grade_level
-        self.name:str = name
+        self.topic_id:Optional[str] = topic_id
 
         self._topics: Optional[List[Topic]] = None
         self._current_topic: Optional[Topic] = None
@@ -26,6 +24,10 @@ class Student:
     def _set_topics(self,):
         # load all available topics for the student
         self._topics = get_students_topics(self.student_id)
+    
+    def set_topic(self,topic_id:str):
+        self.topic_id = topic_id
+        self._current_topic = self._get_topic(self.topic_id)
 
     def _get_topic(self,topic_id:str)->Topic:
         # set the current topic for the student
@@ -41,26 +43,26 @@ class Student:
         return topic    
     
     def _start_session(self,):
-
+        assert self.topic_id is not None,"Topic ID is not set"
+        print(f"Starting session for student {self.student_id} and topic {self.topic_id}")
         result = start_conversation(student_id=self.student_id,topic_id=self.topic_id)
         self._conversation_id = result.conversation_id
         self.conversations_remaining = result.conversations_remaining
 
-    def answer_tutor(self,tutor_message:str)->InteractionResult:
-
-        # start a session if there is no conversation id
+    def get_response(self,question:str)->InteractionResult:
         if self._conversation_id is None:
             self._start_session()
-        return interact(self._conversation_id,tutor_message)
+        return interact(self._conversation_id,question)
 
     @property
     def topics(self,):
         return self._topics
     
     @property
-    def current_topic(self,):
+    def topic(self,):
         if self._current_topic is None:
-            self._current_topic = self._get_topic(self.topic_id)
+            assert self.topic_id is not None,"Topic ID is not set"
+            self.set_topic(self.topic_id)
         return self._current_topic
     
 

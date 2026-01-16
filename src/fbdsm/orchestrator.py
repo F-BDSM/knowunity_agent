@@ -1,35 +1,56 @@
-from fbdsm.student import Student
-from fbdsm.interaction_result import InteractionResult
 from typing import List
+from tqdm import tqdm
+import dspy
+from .student import Student
+from .models import InteractionResult, ConversationTurn,QuestionAgentInput
+from .agents import QuestionAgent
+from .api import get_students_topics
+
 
 class TutoringOrchestrator:
 
-    def __init__(self,max_turns:int=10):
+    def __init__(self,student_id:str,max_turns:int=10):
         self.max_turns = max_turns
-        self._current_session: List[InteractionResult] = []
+        self._interactions: List[InteractionResult] = []
+        self.student = Student(student_id)
+        self.current_conversation_id: Optional[str] = None
+        self.question_agent = QuestionAgent()
+        self._messages: List[dict] = []
+
+    def run_session(self,topic_id:str,) -> List[dict]:
+
+        self._messages = []
+
+        self.student.set_topic(topic_id)
+        last_student_response = None
         
+        for i in tqdm(range(self.max_turns),desc="Running tutoring session"):
+            topic = self.student.topic
+                
+            # 1. Call the question generator agent
+            question_agent_input = QuestionAgentInput(
+                grade_level=topic.grade_level,
+                topic_name=topic.name,
+                subject_name=topic.subject_name,
+                difficulty="easy",
+                previous_student_response=last_student_response
+            )
+            history = dspy.History(messages=self._messages) if len(self._messages) > 0 else None
+            question = self.question_agent.generate(request=question_agent_input,history=history)
+            
+            # 2. Send the question to the student
+            result = self.student.get_response(question)            
+            self._messages.append({
+                "question": question,
+                "request": question_agent_input.model_dump()
+            })
+            self.current_conversation_id = result.conversation_id
+            last_student_response = result.student_response
 
-    def run_session(self,student_id:str, topic_id:str,) -> List[InteractionResult]:
-
-        self._current_session = []
-
-        student = Student(student_id,topic_id)
+            if result.turn_number == self.max_turns:
+                break
         
-        # 1. Call the question generator agent
-        question = ...
-        
-        # 2. Send the question to the student
-        answer = student.answer_tutor(question)
-
-        # 4. If last_turn == max_turns, end the session
-        if answer.turn_number == self.max_turns:
-            return self._current_session
-        
-        # 5. Else, concatenate the student's answer with the previous context and go back to step 1
-        else:
-            self._current_session.append(answer)
-
-        return self._current_session
+        return self._interactions
 
     def get_all_topics(self,):
         pass

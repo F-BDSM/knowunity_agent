@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 class StudentInfo(BaseModel):
@@ -22,6 +22,7 @@ class InteractionStartResult(BaseModel):
     conversations_remaining: Optional[int]=None
 
 class InteractionResult(BaseModel):
+
     tutor_message: str
     conversation_id: str
     interaction_id: str
@@ -35,3 +36,17 @@ class Topic(BaseModel):
     subject_name: str
     name: str
     grade_level: int
+
+class QuestionAgentInput(BaseModel):
+
+    subject_name: str = Field(..., description="The subject name for the question")
+    topic_name: str = Field(..., description="The topic name for the question")
+    grade_level: int = Field(..., description="The grade level for the question")
+    difficulty: str = Field(..., description="The difficulty level for the question")
+    previous_student_response: Optional[str] = Field(None, description="The previous student response for the question")
+
+class ConversationTurn(BaseModel):
+
+    question: str
+    student_response:str
+    request:QuestionAgentInput

@@ -75,8 +75,9 @@ def start_conversation(student_id: str, topic_id: str)->InteractionStartResult:
         "student_id": student_id,
         "topic_id": topic_id,
     }
-    response = requests.post(url, json=payload, headers=headers).json()
-    return InteractionStartResult(**response)
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
+    return InteractionStartResult(**response.json())
 
 
 def interact(conversation_id: str, tutor_message: str)->InteractionResult:
@@ -90,8 +91,9 @@ def interact(conversation_id: str, tutor_message: str)->InteractionResult:
         "conversation_id": conversation_id,
         "tutor_message": tutor_message,
     }
-    response = requests.post(url, json=payload, headers=headers).json()
-    return InteractionResult(tutor_message=tutor_message,**response)
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
+    return InteractionResult(tutor_message=tutor_message,**response.json())
 
 
 def submit_mse_predictions(student_id: str, topic_id: str, predicted_level: int, set_type: str = "mini_dev"):
@@ -112,8 +114,8 @@ def submit_mse_predictions(student_id: str, topic_id: str, predicted_level: int,
         "set_type": set_type,
     }
     response = requests.post(url, json=payload, headers=headers)
-    data = response.json()
-    return data
+    response.raise_for_status()
+    return response.json()
 
 
 def evaluate_tutoring(set_type: str = "mini_dev"):
