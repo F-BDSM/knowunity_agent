@@ -11,13 +11,17 @@ List of Functions:
 """
 import requests
 import os
-from fbdsm.config import settings
+from typing import List,Optional
+
+from .config import settings
+from .models import StudentInfo,TopicInfo,InteractionStartResult,InteractionResult,Topic
+
 
 BASE_URL = settings.KNOWUNITY_API_URL
 API_KEY = settings.KNOWUNITY_API_KEY
 
 
-def get_students(set_type: str = "mini_dev"):
+def get_students(set_type: str = "mini_dev")->List[StudentInfo]:
     url = f"{BASE_URL}/students"
     params = {
         "set_type": set_type
@@ -26,18 +30,18 @@ def get_students(set_type: str = "mini_dev"):
         "accept": "application/json"
     }
     response = requests.get(url, params=params, headers=headers)
-    data = response.json()
-    return data
+    data = response.json()['students']
+    return [StudentInfo(**student) for student in data]
 
 
-def get_students_topics(student_id: str):
+def get_students_topics(student_id: str)->List[TopicInfo]:
     url = f"{BASE_URL}/students/{student_id}/topics"
     headers = {
         "accept": "application/json"
     }
     response = requests.get(url, headers=headers)
-    data = response.json()
-    return data
+    data = response.json()['topics']
+    return [TopicInfo(**topic) for topic in data]
 
 
 def get_subjects():
@@ -51,17 +55,16 @@ def get_subjects():
     return data
 
 
-def get_topics(subject_id: str):
+def get_topics(subject_id: str)->List[TopicInfo]:
     url = f"{BASE_URL}/topics"
     headers = {
         "accept": "application/json"
     }
-    response = requests.get(url, headers=headers)
-    data = response.json()
-    return data
+    response = requests.get(url, headers=headers).json()
+    return [TopicInfo(**topic) for topic in response]
 
 
-def start_conversation(student_id: str, topic_id: str):
+def start_conversation(student_id: str, topic_id: str)->InteractionStartResult:
     url = f"{BASE_URL}/interact/start"
     headers = {
         "accept": "application/json",
@@ -72,12 +75,11 @@ def start_conversation(student_id: str, topic_id: str):
         "student_id": student_id,
         "topic_id": topic_id,
     }
-    response = requests.post(url, json=payload, headers=headers)
-    data = response.json()
-    return data
+    response = requests.post(url, json=payload, headers=headers).json()
+    return InteractionStartResult(**response)
 
 
-def interact(conversation_id: str, tutor_message: str):
+def interact(conversation_id: str, tutor_message: str)->InteractionResult:
     url = f"{BASE_URL}/interact"
     headers = {
         "accept": "application/json",
@@ -88,9 +90,8 @@ def interact(conversation_id: str, tutor_message: str):
         "conversation_id": conversation_id,
         "tutor_message": tutor_message,
     }
-    response = requests.post(url, json=payload, headers=headers)
-    data = response.json()
-    return data
+    response = requests.post(url, json=payload, headers=headers).json()
+    return InteractionResult(tutor_message=tutor_message,**response)
 
 
 def submit_mse_predictions(student_id: str, topic_id: str, predicted_level: int, set_type: str = "mini_dev"):
