@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from enum import StrEnum
@@ -74,7 +74,7 @@ Student's Response: {student_response}
 
 Evaluate the correctness of the response and identify any knowledge gaps or strengths."""
 
-    def analyze(
+    async def analyze(
         self,
         question: str,
         student_response: str,
@@ -90,5 +90,5 @@ Evaluate the correctness of the response and identify any knowledge gaps or stre
             topic_name=topic_name,
             grade_level=grade_level,
         )
-        result = self.agent.run_sync(prompt)
+        result = await self.agent.run(prompt)
         return result.output

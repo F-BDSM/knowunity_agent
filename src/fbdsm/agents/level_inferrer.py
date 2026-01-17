@@ -82,7 +82,7 @@ class LevelInferrer:
 
         return "\n".join(prompt_parts)
 
-    def infer(
+    async def infer(
         self,
         topic_name: str,
         grade_level: int,
@@ -96,5 +96,5 @@ class LevelInferrer:
             conversation_history=conversation_history,
             current_estimate=current_estimate,
         )
-        result = self.agent.run_sync(prompt)
+        result = await self.agent.run(prompt)
         return result.output

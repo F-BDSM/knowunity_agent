@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from ..config import settings
 
+
 class Score(StrEnum):
     STRUGGLING = "Struggling"
     BELOW_GRADE = "Below-grade"
@@ -60,10 +61,8 @@ class ScoringAgent:
         
         return "\n".join(prompt_parts)
 
-    def __call__(self, conversation: List[dict]) -> int:
+    async def generate(self, conversation: List[dict]) -> int:
+        """Generate a score for the conversation."""
         prompt = self._build_prompt(conversation)
-        result = self.agent.run_sync(prompt)
+        result = await self.agent.run(prompt)
         return MAPPING[result.output.score]
-
-    def generate(self, conversation: List[dict]) -> int:
-        return self(conversation)
