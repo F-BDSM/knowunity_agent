@@ -4,7 +4,7 @@ from fbdsm.api import get_students,get_students_topics
 import fire
 
 def main():
-    student_info = get_students()[0]
+    student_info = get_students('mini_dev')[0]
     topic_info = get_students_topics(student_info.id)[0]
     orchestrator = TutoringOrchestrator(student_info.id)
 

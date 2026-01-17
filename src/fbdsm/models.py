@@ -42,7 +42,6 @@ class QuestionAgentInput(BaseModel):
     subject_name: str = Field(..., description="The subject name for the question")
     topic_name: str = Field(..., description="The topic name for the question")
     grade_level: int = Field(..., description="The grade level for the question")
-    difficulty: str = Field(..., description="The difficulty level for the question")
     previous_student_response: Optional[str] = Field(None, description="The previous student response for the question")
 
 class ConversationTurn(BaseModel):
