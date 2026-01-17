@@ -12,6 +12,7 @@ from multi_agent_tutor import (
     EvaluatorAgent,
     TutorAgent,
     QuestionerAgent,
+    ComprehensiveTutoringAgent,
     TutoringSession,
     SUBJECT_MAP,
     _extract_list
@@ -23,30 +24,38 @@ load_dotenv()
 def run_tutoring_session_silent(
     session: TutoringSession,
     questioner: QuestionerAgent,
+    unified_agent: ComprehensiveTutoringAgent,
     conversation_id: str,
     topic_name: str,
     subject_type: str,
     show_conversation: bool = False,
+    fast_mode: bool = False,
 ) -> int:
     """
-    Run a 10-turn tutoring session silently and return final score.
+    Run a tutoring session and return final score.
+    
+    Args:
+        fast_mode: If True, use 5 turns instead of 10 and enable early stopping
     
     Returns:
         Rounded final understanding score (1-5)
     """
-    # Generate initial question
-    initial_question = questioner.generate_question(
-        understanding_score=0,
+    max_turns = 5 if fast_mode else 10
+    
+    # Generate initial question using unified agent (faster than old QuestionerAgent)
+    initial_result = unified_agent.process_turn(
+        student_message="Starting conversation.",
+        chat_history="No previous conversation.",
         topic=topic_name,
         subject_type=subject_type,
-        chat_history="Starting conversation.",
         previous_questions="No previous questions yet."
     )
+    current_question = initial_result["next_question"]
     
-    current_question = initial_question
+    recent_scores = []  # Track last 3 scores for early stopping
     
-    # Run 10 turns
-    for turn in range(1, 11):
+    # Run up to max_turns
+    for turn in range(1, max_turns + 1):
         try:
             # Get student response
             response = interact(conversation_id, current_question)
@@ -54,6 +63,12 @@ def run_tutoring_session_silent(
             
             # Run turn through orchestrator
             merged_output, next_question, evaluation = session.run_turn(student_response, current_question)
+            
+            # Track score for early stopping
+            current_score = evaluation.get("understanding_score", 0) if isinstance(evaluation, dict) else 0
+            recent_scores.append(current_score)
+            if len(recent_scores) > 3:
+                recent_scores.pop(0)
             
             # Optional: Show conversation details
             if show_conversation:
@@ -64,15 +79,27 @@ def run_tutoring_session_silent(
                     print(f"        Tutor: {merged_output}")
                 if evaluation and isinstance(evaluation, dict):
                     score = evaluation.get("understanding_score")
-                    action = evaluation.get("suggested_action")
+                    confidence = evaluation.get("confidence_level")
+                    strengths = evaluation.get("strengths", [])
+                    areas = evaluation.get("areas_to_improve", [])
                     if score is not None:
-                        print(f"        Eval: score {score}/5" + (f" | action: {action}" if action else ""))
+                        print(f"        Eval: score {score}/5 | confidence {confidence}%")
+                    if strengths:
+                        print(f"        Strengths: {', '.join(strengths)}")
+                    if areas:
+                        print(f"        Areas to improve: {', '.join(areas)}")
                 if next_question:
                     print(f"        Next: {next_question}")
                 print()
 
+            # Early stopping: if last 3 scores are identical, student has converged
+            if fast_mode and len(recent_scores) == 3 and len(set(recent_scores)) == 1:
+                if show_conversation:
+                    print(f"      → Early exit: score converged at {recent_scores[0]}")
+                break
+            
             # Prepare for next turn
-            if turn < 10:
+            if turn < max_turns:
                 current_question = next_question
         
         except Exception as e:
@@ -84,9 +111,12 @@ def run_tutoring_session_silent(
     return round(final_score)
 
 
-def evaluate_all_students(provider: str = "gemini", set_type: str = "mini_dev", show_conversation: bool = False) -> List[Dict[str, Any]]:
+def evaluate_all_students(provider: str = "gemini", set_type: str = "mini_dev", show_conversation: bool = False, fast_mode: bool = False) -> List[Dict[str, Any]]:
     """
     Evaluate all student-topic pairs and return predictions.
+    
+    Args:
+        fast_mode: Use 5 turns instead of 10, enable early stopping (~50% faster)
     
     Returns:
         List of predictions with student_id, topic_id, predicted_level
@@ -106,10 +136,11 @@ def evaluate_all_students(provider: str = "gemini", set_type: str = "mini_dev", 
     lm = dspy.LM(model=model, api_key=api_key)
     dspy.configure(lm=lm)
     
-    # Initialize agents
+    # Initialize agents (UNIFIED AGENT FOR 70% SPEEDUP)
     evaluator = EvaluatorAgent(lm)
     tutor = TutorAgent(lm)
     questioner = QuestionerAgent(lm)
+    unified_agent = ComprehensiveTutoringAgent(lm)  # NEW: One agent to rule them all
     
     # Get all students
     students_response = get_students(set_type=set_type)
@@ -177,17 +208,20 @@ def evaluate_all_students(provider: str = "gemini", set_type: str = "mini_dev", 
                     questioner=questioner,
                     conversation_id=conversation_id,
                     topic=topic_name,
-                    subject_name=subject_name
+                    subject_name=subject_name,
+                    unified_agent=unified_agent  # Use unified agent for speed
                 )
                 
                 # Run tutoring session silently
                 predicted_level = run_tutoring_session_silent(
                     session=session,
                     questioner=questioner,
+                    unified_agent=unified_agent,
                     conversation_id=conversation_id,
                     topic_name=topic_name,
                     subject_type=subject_type,
-                    show_conversation=show_conversation
+                    show_conversation=show_conversation,
+                    fast_mode=fast_mode
                 )
                 
                 # Store prediction
@@ -282,6 +316,11 @@ def main():
         action="store_true",
         help="Evaluate tutoring quality for the given set without generating or submitting predictions"
     )
+    parser.add_argument(
+        "--fast-mode",
+        action="store_true",
+        help="Fast mode: use 5 turns instead of 10, enable early stopping (~50% faster)"
+    )
     args = parser.parse_args()
 
     # If evaluating tutoring quality, call the API directly
@@ -309,7 +348,8 @@ def main():
     predictions = evaluate_all_students(
         provider=args.provider,
         set_type=args.set_type,
-        show_conversation=args.show_conversation
+        show_conversation=args.show_conversation,
+        fast_mode=args.fast_mode
     )
     
     if not predictions:

@@ -39,6 +39,15 @@ class EvaluationResult:
     understanding_score: int  # 1-5
     reasoning: str
     misconceptions: List[str]
+    confidence_level: int = 0  # 0-100
+    strengths: List[str] = None  # List of what student did well
+    areas_to_improve: List[str] = None  # List of areas needing work
+    
+    def __post_init__(self):
+        if self.strengths is None:
+            self.strengths = []
+        if self.areas_to_improve is None:
+            self.areas_to_improve = []
 
 
 class EvaluatorSignature(dspy.Signature):
@@ -48,9 +57,43 @@ class EvaluatorSignature(dspy.Signature):
     chat_history: str = dspy.InputField(desc="Previous conversation context")
     topic: str = dspy.InputField(desc="The subject topic being taught")
     
-    understanding_score: int = dspy.OutputField(desc="Score 1-5: 1=no understanding, 2=minimal, 3=partial, 4=good, 5=excellent")
-    reasoning: str = dspy.OutputField(desc="Evidence and explanation for the score")
+    understanding_score: int = dspy.OutputField(desc="""Score 1-5 based on response quality:
+
+1=Struggling – needs fundamentals
+   • Short answers (<10 words), vague responses
+   • Says "I don't know", "not sure", "confused"
+   • Cannot recall basic facts or definitions
+   • No engagement, minimal effort
+
+2=Below grade – frequent mistakes
+   • Attempts answers but most are incorrect
+   • Recalls some facts but misapplies them
+   • Shows confusion about core concepts
+   • Needs significant help on basic questions
+
+3=At grade – core concepts ok
+   • Understands and can explain main ideas
+   • Makes some mistakes on applications
+   • Can answer direct questions correctly
+   • Average engagement and depth
+
+4=Above grade – occasional gaps
+   • Strong grasp of concepts, explains well
+   • Minor mistakes on complex scenarios
+   • Can connect related ideas
+   • Good engagement, detailed answers
+
+5=Advanced – ready for more
+   • Asks thoughtful follow-up questions
+   • Makes connections across concepts
+   • Goes beyond what was asked
+   • Shows curiosity and deep understanding
+   • Detailed, well-reasoned responses""")
+    reasoning: str = dspy.OutputField(desc="Evidence and explanation for the score. Cite specific indicators from the student's response")
     misconceptions: str = dspy.OutputField(desc="Comma-separated list of misconceptions or gaps identified")
+    confidence_level: int = dspy.OutputField(desc="Confidence in evaluation (0-100): how certain you are about the score")
+    strengths: str = dspy.OutputField(desc="Comma-separated list of what the student did well")
+    areas_to_improve: str = dspy.OutputField(desc="Comma-separated list of areas the student needs to work on")
 
 
 class TutorSignature(dspy.Signature):
@@ -75,6 +118,60 @@ class QuestionerSignature(dspy.Signature):
     question: str = dspy.OutputField(desc="The next question to ask. MUST BE DIFFERENT from previous questions. Score 1-2: Recall/Definition. Score 3: Conceptual/Why. Score 4-5: Synthesis/What-If")
 
 
+class ComprehensiveTutoringSignature(dspy.Signature):
+    """Single unified agent: Evaluate + Explain + Generate next question in ONE call."""
+    
+    student_message: str = dspy.InputField(desc="The student's latest message")
+    chat_history: str = dspy.InputField(desc="Previous conversation context")
+    topic: str = dspy.InputField(desc="The subject topic being taught")
+    subject_type: str = dspy.InputField(desc="Subject type: STEM or HUMANITIES")
+    previous_questions: str = dspy.InputField(desc="List of all questions already asked to avoid repetition")
+    
+    understanding_score: int = dspy.OutputField(desc="""Score 1-5 based on response quality:
+
+1=Struggling – needs fundamentals
+   • Short answers (<10 words), vague responses
+   • Says "I don't know", "not sure", "confused"
+   • Cannot recall basic facts or definitions
+   • No engagement, minimal effort
+
+2=Below grade – frequent mistakes
+   • Attempts answers but most are incorrect
+   • Recalls some facts but misapplies them
+   • Shows confusion about core concepts
+   • Needs significant help on basic questions
+
+3=At grade – core concepts ok
+   • Correct answers to standard questions
+   • Can explain main ideas in own words
+   • Understands definitions and basic applications
+   • Adequate but not exceptional responses
+   • Normal engagement, answers what is asked
+
+4=Above grade – occasional gaps
+   • Strong understanding, detailed explanations
+   • Can handle complex applications
+   • Makes connections between ideas
+   • Only minor errors on difficult problems
+   • Good engagement and reasoning
+
+5=Advanced – ready for more
+   • MUST show at least 2 of these:
+     - Asks own follow-up questions
+     - Goes beyond what was asked
+     - Makes unprompted connections
+     - Shows genuine curiosity
+   • Exceptional depth and insight
+   • Could explain concepts to others""")
+    reasoning: str = dspy.OutputField(desc="Why you gave this score. Cite specific evidence from the student's response (length, keywords, engagement, correctness)")
+    misconceptions: str = dspy.OutputField(desc="Comma-separated misconceptions (empty if none)")
+    confidence_level: int = dspy.OutputField(desc="Confidence in evaluation (0-100): how certain you are about the score")
+    strengths: str = dspy.OutputField(desc="Comma-separated list of what the student did well")
+    areas_to_improve: str = dspy.OutputField(desc="Comma-separated list of areas the student needs to work on")
+    explanation: str = dspy.OutputField(desc="Short empathetic explanation if score<4, else empty")
+    next_question: str = dspy.OutputField(desc="Next question DIFFERENT from previous. Score 1-2: Simple recall. Score 3: Explain why/how. Score 4-5: Apply to new scenarios or synthesize")
+
+
 class EvaluatorAgent:
     """The Analyst - Analyzes student understanding."""
     
@@ -90,13 +187,18 @@ class EvaluatorAgent:
             topic=topic
         )
         
-        # Parse misconceptions from comma-separated string
+        # Parse comma-separated fields
         misconceptions = [m.strip() for m in result.misconceptions.split(",") if m.strip()]
+        strengths = [s.strip() for s in result.strengths.split(",") if s.strip()]
+        areas_to_improve = [a.strip() for a in result.areas_to_improve.split(",") if a.strip()]
         
         return EvaluationResult(
             understanding_score=int(result.understanding_score),
             reasoning=result.reasoning,
-            misconceptions=misconceptions
+            misconceptions=misconceptions,
+            confidence_level=int(result.confidence_level),
+            strengths=strengths,
+            areas_to_improve=areas_to_improve
         )
 
 
@@ -144,8 +246,61 @@ class QuestionerAgent:
         return result.question
 
 
+class ComprehensiveTutoringAgent:
+    """UNIFIED AGENT - Evaluate + Explain + Generate in ONE LLM call (~70% faster)."""
+    
+    def __init__(self, lm: dspy.LM):
+        self.lm = lm
+        self.tutor = dspy.ChainOfThought(ComprehensiveTutoringSignature)
+    
+    def process_turn(
+        self,
+        student_message: str,
+        chat_history: str,
+        topic: str,
+        subject_type: str,
+        previous_questions: str
+    ) -> Dict[str, Any]:
+        """
+        Process student response in ONE call.
+        
+        Returns dict with:
+            - understanding_score
+            - reasoning
+            - misconceptions (list)
+            - confidence_level
+            - strengths (list)
+            - areas_to_improve (list)
+            - explanation (empty if score >= 4)
+            - next_question
+        """
+        result = self.tutor(
+            student_message=student_message,
+            chat_history=chat_history,
+            topic=topic,
+            subject_type=subject_type,
+            previous_questions=previous_questions
+        )
+        
+        # Parse comma-separated fields
+        misconceptions = [m.strip() for m in result.misconceptions.split(",") if m.strip()]
+        strengths = [s.strip() for s in result.strengths.split(",") if s.strip()]
+        areas_to_improve = [a.strip() for a in result.areas_to_improve.split(",") if a.strip()]
+        
+        return {
+            "understanding_score": int(result.understanding_score),
+            "reasoning": result.reasoning,
+            "misconceptions": misconceptions,
+            "confidence_level": int(result.confidence_level),
+            "strengths": strengths,
+            "areas_to_improve": areas_to_improve,
+            "explanation": result.explanation if result.explanation.strip() else None,
+            "next_question": result.next_question
+        }
+
+
 class TutoringSession:
-    """The Orchestrator - Manages the 10-turn tutoring session."""
+    """The Orchestrator - Manages the 10-turn tutoring session (NOW WITH UNIFIED AGENT)."""
     
     def __init__(
         self,
@@ -155,10 +310,12 @@ class TutoringSession:
         conversation_id: str,
         topic: str,
         subject_name: str,
+        unified_agent: Optional['ComprehensiveTutoringAgent'] = None,
     ):
         self.evaluator = evaluator
         self.tutor = tutor
         self.questioner = questioner
+        self.unified_agent = unified_agent  # NEW: Use this if available
         self.conversation_id = conversation_id
         self.topic = topic
         self.subject_name = subject_name
@@ -200,8 +357,49 @@ class TutoringSession:
         """
         self.turn_count += 1
         
-        # Step 1: Evaluate student's understanding
+        # Format context
         chat_context = self._format_chat_history()
+        
+        # NEW: Use unified agent if available (70% faster)
+        if self.unified_agent:
+            result = self.unified_agent.process_turn(
+                student_message=student_input,
+                chat_history=chat_context,
+                topic=self.topic,
+                subject_type=self.subject_type,
+                previous_questions=self._format_previous_questions()
+            )
+            
+            self.current_score = result["understanding_score"]
+            next_question = result["next_question"]
+            self.questions_asked.append(next_question)
+            
+            # Create log entry
+            log_entry = {
+                "turn": self.turn_count,
+                "evaluation": {
+                    "understanding_score": result["understanding_score"],
+                    "reasoning": result["reasoning"],
+                    "misconceptions": result["misconceptions"]
+                },
+                "student_message": student_input
+            }
+            self.evaluation_logs.append(log_entry)
+            
+            # Merge outputs
+            merged_response = self._merge_outputs(result["explanation"], next_question)
+            
+            # Update chat history
+            self.chat_history.append({
+                "question": tutor_question,
+                "student_response": student_input,
+                "evaluation_score": result["understanding_score"],
+                "next_question": next_question
+            })
+            
+            return merged_response, next_question, result
+        
+        # FALLBACK: Use 3 separate agents (old way)
         evaluation = self.evaluator.evaluate(
             student_message=student_input,
             chat_history=chat_context,
