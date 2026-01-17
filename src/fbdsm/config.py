@@ -1,13 +1,13 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import dspy
+import os
 
 class Settings(BaseSettings):
     KNOWUNITY_API_KEY: str
-    OPENAI_API_KEY: str
-    LLM_API_URL: str
+    #OPENAI_API_KEY: str
+    #LLM_API_URL: str
+    OPENROUTER_API_KEY: str
     MODEL_NAME: str
     KNOWUNITY_API_URL: str = "https://knowunity-agent-olympics-2026-api.vercel.app"
-    
     
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -19,5 +19,5 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-lm = dspy.LM(model=settings.MODEL_NAME, api_key=settings.OPENAI_API_KEY,api_base=settings.LLM_API_URL)
-dspy.configure(lm=lm)
+
+os.environ["OPENROUTER_API_KEY"] = settings.OPENROUTER_API_KEY

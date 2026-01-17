@@ -29,18 +29,14 @@ class Student:
         self.topic_id = topic_id
         self._current_topic = self._get_topic(self.topic_id)
 
-    def _get_topic(self,topic_id:str)->Topic:
-        # set the current topic for the student
+    def _get_topic(self, topic_id: str) -> Topic:
+        """Get a specific topic by ID for the student."""
         if self._topics is None:
             self._set_topics()
-        topic = None
-        for topic in self._topics:
-            if topic.id == topic_id:
-                topic = topic
-                break
-        if topic is None:
-            raise ValueError(f"Topic {topic_id} not found for student {self.id}")
-        return topic    
+        for t in self._topics:
+            if t.id == topic_id:
+                return t
+        raise ValueError(f"Topic {topic_id} not found for student {self.student_id}")    
     
     def _start_session(self,):
         assert self.topic_id is not None,"Topic ID is not set"
@@ -56,6 +52,8 @@ class Student:
 
     @property
     def topics(self,):
+        if self._topics is None:
+            self._set_topics()
         return self._topics
     
     @property
