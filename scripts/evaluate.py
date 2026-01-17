@@ -54,7 +54,4 @@ def test(student_id: str = None, topic_id: str = None):
 
 
 if __name__ == "__main__":
-    fire.Fire({
-        "evaluate": evaluate,
-        "test": test,
-    })
+    fire.Fire()

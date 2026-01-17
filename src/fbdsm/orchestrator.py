@@ -1,12 +1,13 @@
 import asyncio
 import aiohttp
-from typing import List, Optional
+from typing import List, Optional, Dict
 from tqdm.asyncio import tqdm
 
 from .student import Student
-from .models import TutorAgentInput
+from .models import TutorAgentInput, AssessmentStats
 from .agents import TutorAgent, ScoringAgent, ResponseAnalyzer, LevelInferrer
 from .api import create_session
+from .early_stopping import EarlyStopping
 
 
 class TutoringOrchestrator:
@@ -55,8 +56,46 @@ class TutoringOrchestrator:
         level_confidence: float = 0.0  # Start with no confidence
         level_estimates = []
         level_estimates_confidences = []
+        
+        # Assessment statistics tracking
+        difficulty_counts: Dict[str, int] = {"easy": 0, "medium": 0, "hard": 0}
+        correctness_counts: Dict[str, int] = {"correct": 0, "partial": 0, "incorrect": 0}
+        confidence_levels: List[int] = []
+        consecutive_correct: int = 0
+        consecutive_incorrect: int = 0
+        level_stability_count: int = 0
+        previous_level_estimate: int = 3
+        
+        # Early stopping controller
+        early_stopping = EarlyStopping()
 
         for i in tqdm(range(self.max_turns), desc="Running tutoring session"):
+            # Build current assessment stats
+            avg_confidence = sum(confidence_levels) / len(confidence_levels) if confidence_levels else 3.0
+            
+            # Compute confidence trend
+            if len(confidence_levels) >= 3:
+                recent = confidence_levels[-3:]
+                if recent[-1] > recent[0]:
+                    confidence_trend = "increasing"
+                elif recent[-1] < recent[0]:
+                    confidence_trend = "decreasing"
+                else:
+                    confidence_trend = "stable"
+            else:
+                confidence_trend = "stable"
+            
+            assessment_stats = AssessmentStats(
+                total_questions=len(self.q_a_pairs),
+                difficulty_distribution=difficulty_counts.copy(),
+                correctness_distribution=correctness_counts.copy(),
+                avg_confidence_level=avg_confidence,
+                confidence_trend=confidence_trend,
+                consecutive_correct=consecutive_correct,
+                consecutive_incorrect=consecutive_incorrect,
+                level_stability=level_stability_count,
+            )
+            
             # 1. Generate adaptive tutor response
             tutor_input = TutorAgentInput(
                 grade_level=topic.grade_level,
@@ -69,8 +108,14 @@ class TutoringOrchestrator:
                 previous_student_response=last_student_response,
                 previous_question_difficulty=last_question_difficulty,
                 previous_response_analysis=last_response_analysis,
+                assessment_stats=assessment_stats,
             )
-            tutor_message, question_difficulty = await self.tutor_agent.run(request=tutor_input)
+            tutor_message, question_difficulty, should_conclude = await self.tutor_agent.run(request=tutor_input)
+            
+            # Update difficulty counts
+            diff_key = str(question_difficulty).lower()
+            if diff_key in difficulty_counts:
+                difficulty_counts[diff_key] += 1
 
             # 2. Send message to student and get response
             result = await self.student.get_response(session, tutor_message)
@@ -87,6 +132,24 @@ class TutoringOrchestrator:
                 grade_level=topic.grade_level,
             )
             last_response_analysis = response_analysis
+            
+            # Update correctness counts and consecutive streaks
+            correctness_key = str(response_analysis.correctness).lower()
+            if correctness_key in correctness_counts:
+                correctness_counts[correctness_key] += 1
+            
+            if response_analysis.correctness.value == "correct":
+                consecutive_correct += 1
+                consecutive_incorrect = 0
+            elif response_analysis.correctness.value == "incorrect":
+                consecutive_incorrect += 1
+                consecutive_correct = 0
+            else:  # partial
+                consecutive_correct = 0
+                consecutive_incorrect = 0
+            
+            # Track confidence level from response analysis
+            confidence_levels.append(response_analysis.confidence_level)
 
             # 4. Store the turn data
             turn_data = {
@@ -100,7 +163,7 @@ class TutoringOrchestrator:
                 "turn": i + 1,
                 "tutor_message": tutor_message,
                 "student_response": last_student_response,
-                "request": tutor_input.model_dump(exclude={"previous_response_analysis"}),
+                "request": tutor_input.model_dump(exclude={"previous_response_analysis", "assessment_stats"}),
             })
 
             # 5. Update level estimate (after first turn)
@@ -111,12 +174,33 @@ class TutoringOrchestrator:
                     conversation_history=self.q_a_pairs,
                     current_estimate=current_level_estimate,
                 )
+                
+                # Track level stability
+                if level_estimate.estimated_level == previous_level_estimate:
+                    level_stability_count += 1
+                else:
+                    level_stability_count = 0
+                previous_level_estimate = current_level_estimate
+                
                 current_level_estimate = level_estimate.estimated_level
                 level_confidence = level_estimate.confidence
                 level_estimates.append(level_estimate.estimated_level)
                 level_estimates_confidences.append(level_estimate.confidence)
+                
+            # 6. Check for early termination
+            stop_decision = early_stopping.check(
+                turn=i + 1,
+                level_stability_count=level_stability_count,
+                level_confidence=level_confidence,
+                current_level_estimate=current_level_estimate,
+                tutor_signaled_conclude=should_conclude,
+            )
+            
+            if stop_decision.should_stop:
+                print(f"[Early Termination] {stop_decision.message}")
+                break
 
-        # 6. Final verification with scoring agent
+        # 7. Final verification with scoring agent
         scoring_level = await self.scoring_agent.run(conversation=self.q_a_pairs)
         
         # Average the two predictions and round to nearest integer

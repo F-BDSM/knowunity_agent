@@ -1,5 +1,38 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
+
+
+class AssessmentStats(BaseModel):
+    """Aggregated statistics from the tutoring session for early termination decisions."""
+    total_questions: int = Field(default=0, description="Total number of questions asked")
+    difficulty_distribution: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Count of questions by difficulty level (easy, medium, hard)"
+    )
+    correctness_distribution: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Count of responses by correctness (correct, partial, incorrect)"
+    )
+    avg_confidence_level: float = Field(
+        default=3.0,
+        description="Average confidence level from student responses (1-5)"
+    )
+    confidence_trend: str = Field(
+        default="stable",
+        description="Trend in confidence: 'increasing', 'decreasing', or 'stable'"
+    )
+    consecutive_correct: int = Field(
+        default=0,
+        description="Number of consecutive correct answers"
+    )
+    consecutive_incorrect: int = Field(
+        default=0,
+        description="Number of consecutive incorrect answers"
+    )
+    level_stability: int = Field(
+        default=0,
+        description="Number of turns the level estimate has been stable"
+    )
 
 
 class StudentInfo(BaseModel):
@@ -62,6 +95,10 @@ class TutorAgentInput(BaseModel):
     previous_response_analysis: Optional[Any] = Field(
         None,
         description="Analysis of the previous student response (ResponseAnalysis object)"
+    )
+    assessment_stats: Optional[AssessmentStats] = Field(
+        None,
+        description="Aggregated statistics from the session for early termination decisions"
     )
 
 

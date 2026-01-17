@@ -83,7 +83,7 @@ class Evaluator:
     def __init__(
         self,
         dataset: str = "mini_dev",
-        max_turns: int = 10,
+        max_turns: int = 3,
         max_concurrent: int = 3,
     ):
         self.dataset = dataset
