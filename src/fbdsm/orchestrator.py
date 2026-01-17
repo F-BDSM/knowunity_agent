@@ -5,7 +5,7 @@ from .student import Student
 from .models import InteractionResult, ConversationTurn,QuestionAgentInput
 from .agents import QuestionAgent,ScoringAgent
 from .api import get_students_topics
-
+from concurrent.futures import ThreadPoolExecutor
 
 class TutoringOrchestrator:
 
@@ -62,6 +62,18 @@ class TutoringOrchestrator:
         
         return score
 
+    def run_sessions(self) -> List[dict]:
+        scores = []
+        topic_ids = [topic.id for topic in self.student.topics]
+        with ThreadPoolExecutor(max_workers=3) as executor:
+           for score,topic_id in zip(executor.map(self.run_session,topic_ids),topic_ids):
+               scores.append({
+                   "student_id": self.student.student_id,
+                    "topic_id": topic_id,
+                    "score": score
+                })
+        return scores
+    
     def get_all_topics(self,):
         pass
 

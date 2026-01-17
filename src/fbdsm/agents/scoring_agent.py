@@ -9,6 +9,13 @@ class Score(StrEnum):
     ABOVE_GRADE = "Above-grade"
     ADVANCED = "Advanced"
 
+MAPPING = {
+    Score.STRUGGLING: 1,
+    Score.BELOW_GRADE: 2, 
+    Score.AT_GRADE: 3, 
+    Score.ABOVE_GRADE: 4,
+    Score.ADVANCED: 5
+}
 
 class GenerateScore(dspy.Signature):
     """Generate an educational question appropriate for the grade level and topic to help assess the student's knowledge."""
@@ -25,7 +32,7 @@ class ScoringAgent(dspy.Module):
 
     def forward(self, conversation:List) -> Score:
         result = self.generator(conversation=conversation)
-        return result.score
+        return MAPPING[result.score]
     
     def generate(self, conversation:List)->Score:
         return self(conversation=conversation)
