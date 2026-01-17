@@ -25,7 +25,7 @@ class TutoringOrchestrator:
 
         self.student.set_topic(topic_id)
         last_student_response = None
-        
+        last_question_difficulty = None        
         for i in tqdm(range(self.max_turns),desc="Running tutoring session"):
             topic = self.student.topic
                 
@@ -34,7 +34,8 @@ class TutoringOrchestrator:
                 grade_level=topic.grade_level,
                 topic_name=topic.name,
                 subject_name=topic.subject_name,
-                previous_student_response=last_student_response
+                previous_student_response=last_student_response,
+                previous_question_difficulty=last_question_difficulty
             )
             history = dspy.History(messages=self._messages) if len(self._messages) > 0 else None
             question,question_difficulty = self.question_agent.generate(request=question_agent_input,history=history)
@@ -47,6 +48,7 @@ class TutoringOrchestrator:
             })
             self.current_conversation_id = result.conversation_id
             last_student_response = result.student_response
+            last_question_difficulty = question_difficulty
         
             # 3. Store the question and answer pair
             self.q_a_pairs.append({
