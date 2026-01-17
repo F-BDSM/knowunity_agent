@@ -1,5 +1,5 @@
 import dspy
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from pydantic import BaseModel, Field
 from enum import StrEnum
 
