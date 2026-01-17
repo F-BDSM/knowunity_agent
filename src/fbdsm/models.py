@@ -13,6 +13,10 @@ class AssessmentStats(BaseModel):
         default_factory=dict,
         description="Count of responses by correctness (correct, partial, incorrect)"
     )
+    success_rate_by_difficulty: Dict[str, float] = Field(
+        default_factory=lambda: {"easy": 0.0, "medium": 0.0, "hard": 0.0},
+        description="Percentage of correct answers by difficulty level (0.0 to 100.0)"
+    )
     avg_confidence_level: float = Field(
         default=3.0,
         description="Average confidence level from student responses (1-5)"

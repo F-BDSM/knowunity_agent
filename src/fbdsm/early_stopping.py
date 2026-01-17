@@ -38,12 +38,10 @@ class EarlyStopping:
         min_turns: int = 2,
         plateau_threshold: int = 3,
         high_confidence_threshold: float = 0.9,
-        high_confidence_stability: int = 2,
     ):
         self.min_turns = min_turns
         self.plateau_threshold = plateau_threshold
         self.high_confidence_threshold = high_confidence_threshold
-        self.high_confidence_stability = high_confidence_stability
     
     def check(
         self,
@@ -78,7 +76,7 @@ class EarlyStopping:
         
         # Tertiary: High confidence + some stability
         if (level_confidence >= self.high_confidence_threshold and 
-            level_stability_count >= self.high_confidence_stability):
+            level_stability_count >= self.plateau_threshold):
             return StopDecision(
                 should_stop=True,
                 reason=StopReason.HIGH_CONFIDENCE,

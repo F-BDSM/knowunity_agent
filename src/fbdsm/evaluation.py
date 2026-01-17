@@ -85,10 +85,12 @@ class Evaluator:
         dataset: str = "mini_dev",
         max_turns: int = 3,
         max_concurrent: int = 3,
+        early_stopping_plateau: int = 3,
     ):
         self.dataset = dataset
         self.max_turns = max_turns
         self.max_concurrent = max_concurrent
+        self.early_stopping_plateau = early_stopping_plateau
         self._last_result: Optional[EvaluationResult] = None
 
     async def _run_single_student(
@@ -100,7 +102,10 @@ class Evaluator:
         """Run tutoring sessions for a single student across all their topics."""
         async with semaphore:
             results = []
-            orchestrator = TutoringOrchestrator(student_id, max_turns=self.max_turns)
+            orchestrator = TutoringOrchestrator(student_id,
+            max_turns=self.max_turns, 
+            early_stopping_plateau=self.early_stopping_plateau
+            )
             topics = await orchestrator.get_all_topics(session)
             
             for topic in topics:

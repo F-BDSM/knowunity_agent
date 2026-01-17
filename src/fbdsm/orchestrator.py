@@ -13,10 +13,11 @@ from .early_stopping import EarlyStopping
 class TutoringOrchestrator:
     """Orchestrates adaptive tutoring sessions with real-time level inference."""
 
-    def __init__(self, student_id: str, max_turns: int = 10):
+    def __init__(self, student_id: str, max_turns: int = 7, early_stopping_plateau:int=5):
         self.max_turns = max_turns
         self.student = Student(student_id)
         self.current_conversation_id: Optional[str] = None
+        self.early_stopping_plateau=early_stopping_plateau
 
         # Initialize agents
         self.tutor_agent = TutorAgent()
@@ -59,6 +60,7 @@ class TutoringOrchestrator:
         
         # Assessment statistics tracking
         difficulty_counts: Dict[str, int] = {"easy": 0, "medium": 0, "hard": 0}
+        correct_by_difficulty: Dict[str, int] = {"easy": 0, "medium": 0, "hard": 0}
         correctness_counts: Dict[str, int] = {"correct": 0, "partial": 0, "incorrect": 0}
         confidence_levels: List[int] = []
         consecutive_correct: int = 0
@@ -67,7 +69,8 @@ class TutoringOrchestrator:
         previous_level_estimate: int = 3
         
         # Early stopping controller
-        early_stopping = EarlyStopping()
+        early_stopping = EarlyStopping(plateau_threshold=self.early_stopping_plateau,
+        )
 
         for i in tqdm(range(self.max_turns), desc="Running tutoring session"):
             # Build current assessment stats
@@ -85,10 +88,19 @@ class TutoringOrchestrator:
             else:
                 confidence_trend = "stable"
             
+            # Calculate success rate by difficulty
+            success_rate_by_difficulty: Dict[str, float] = {}
+            for diff in ["easy", "medium", "hard"]:
+                if difficulty_counts[diff] > 0:
+                    success_rate_by_difficulty[diff] = (correct_by_difficulty[diff] / difficulty_counts[diff]) * 100.0
+                else:
+                    success_rate_by_difficulty[diff] = 0.0
+            
             assessment_stats = AssessmentStats(
                 total_questions=len(self.q_a_pairs),
                 difficulty_distribution=difficulty_counts.copy(),
                 correctness_distribution=correctness_counts.copy(),
+                success_rate_by_difficulty=success_rate_by_difficulty,
                 avg_confidence_level=avg_confidence,
                 confidence_trend=confidence_trend,
                 consecutive_correct=consecutive_correct,
@@ -137,6 +149,10 @@ class TutoringOrchestrator:
             correctness_key = str(response_analysis.correctness).lower()
             if correctness_key in correctness_counts:
                 correctness_counts[correctness_key] += 1
+            
+            # Track correct answers by difficulty for success rate calculation
+            if response_analysis.correctness.value == "correct" and diff_key in correct_by_difficulty:
+                correct_by_difficulty[diff_key] += 1
             
             if response_analysis.correctness.value == "correct":
                 consecutive_correct += 1
@@ -196,8 +212,9 @@ class TutoringOrchestrator:
             )
             
             if stop_decision.should_stop:
-                print(f"[Early Termination] {stop_decision.message}")
-                break
+                #print(f"[Early Termination] {stop_decision.message}")
+                #break
+                pass
 
         # 7. Final verification with scoring agent
         scoring_level = await self.scoring_agent.run(conversation=self.q_a_pairs)
