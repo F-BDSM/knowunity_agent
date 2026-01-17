@@ -56,6 +56,8 @@ class Student:
 
     @property
     def topics(self,):
+        if self._topics is None:
+            self._set_topics()
         return self._topics
     
     @property

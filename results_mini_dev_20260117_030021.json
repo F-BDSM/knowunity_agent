@@ -1,0 +1,8 @@
+{
+  "results": {},
+  "errors": {
+    "1c6afe74-c388-4eb1-b82e-8326d95e29a3": "Error code: 400 - {'error': {'message': 'openai/x-ai/grok-4-fast is not a valid model ID', 'code': 400}, 'user_id': 'user_32lzPeFdxHRsqM1raGURcpzjAUj'}",
+    "2ee4a025-4845-47f4-a634-3c9e423a4b0e": "Error code: 400 - {'error': {'message': 'openai/x-ai/grok-4-fast is not a valid model ID', 'code': 400}, 'user_id': 'user_32lzPeFdxHRsqM1raGURcpzjAUj'}",
+    "2b9da93c-5616-49ca-999c-a894b9d004a3": "Error code: 400 - {'error': {'message': 'openai/x-ai/grok-4-fast is not a valid model ID', 'code': 400}, 'user_id': 'user_32lzPeFdxHRsqM1raGURcpzjAUj'}"
+  }
+}

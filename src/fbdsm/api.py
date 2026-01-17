@@ -96,7 +96,14 @@ def interact(conversation_id: str, tutor_message: str)->InteractionResult:
     return InteractionResult(tutor_message=tutor_message,**response.json())
 
 
-def submit_mse_predictions(student_id: str, topic_id: str, predicted_level: int, set_type: str = "mini_dev"):
+def submit_mse_predictions(predictions: List[dict], set_type: str = "mini_dev"):
+    """
+    Submit all predictions in a single batch request.
+
+    Args:
+        predictions: List of dicts with 'student_id', 'topic_id', 'predicted_level'
+        set_type: Dataset type (e.g., 'mini_dev', 'dev')
+    """
     url = f"{BASE_URL}/evaluate/mse"
     headers = {
         "accept": "application/json",
@@ -106,10 +113,11 @@ def submit_mse_predictions(student_id: str, topic_id: str, predicted_level: int,
     payload = {
         "predictions": [
             {
-                "student_id": student_id,
-                "topic_id": topic_id,
-                "predicted_level": predicted_level,
+                "student_id": p["student_id"],
+                "topic_id": p["topic_id"],
+                "predicted_level": int(p["predicted_level"]),
             }
+            for p in predictions
         ],
         "set_type": set_type,
     }
