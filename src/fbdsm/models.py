@@ -71,3 +71,15 @@ class ConversationTurn(BaseModel):
     student_response: str
     question_difficulty: Optional[str] = None
     response_analysis: Optional[dict] = None
+
+class MSEResult(BaseModel):
+    mse_score: float
+    num_predictions: int
+    submission_number: int
+    submissions_remaining: Optional[int] = None
+
+class TutoringResult(BaseModel):
+    score: float
+    num_conversations: int
+    submission_number: int
+    submissions_remaining: Optional[int] = None

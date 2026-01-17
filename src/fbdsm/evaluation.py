@@ -14,6 +14,7 @@ Usage:
 """
 import asyncio
 import json
+import pathlib
 import time
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -160,6 +161,12 @@ class Evaluator:
                 session_results=all_results,
                 total_duration_seconds=total_duration,
             )
+
+            try:
+                pathlib.Path("eval_results").mkdir(exist_ok=True)
+                result.save(f"eval_results/{self.dataset}_{datetime.now().isoformat()}.json")
+            except Exception as e:
+                print(f"Error saving result: {e}")
             
             # Submit predictions if requested
             if submit and all_results:
@@ -170,7 +177,7 @@ class Evaluator:
                 
                 try:
                     mse_response = await submit_mse_predictions(session, predictions, set_type=self.dataset)
-                    result.mse_score = mse_response.get("mse")
+                    result.mse_score = mse_response.mse_score
                     print(f"MSE Score: {result.mse_score}")
                 except Exception as e:
                     print(f"Error submitting MSE predictions: {e}")

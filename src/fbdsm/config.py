@@ -3,8 +3,7 @@ import os
 
 class Settings(BaseSettings):
     KNOWUNITY_API_KEY: str
-    #OPENAI_API_KEY: str
-    #LLM_API_URL: str
+    OPENAI_API_KEY: str
     OPENROUTER_API_KEY: str
     MODEL_NAME: str
     KNOWUNITY_API_URL: str = "https://knowunity-agent-olympics-2026-api.vercel.app"
@@ -19,5 +18,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+print("Model name: ", settings.MODEL_NAME)
 
 os.environ["OPENROUTER_API_KEY"] = settings.OPENROUTER_API_KEY
+os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY

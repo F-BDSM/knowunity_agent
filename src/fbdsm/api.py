@@ -15,7 +15,7 @@ import aiohttp
 from typing import List, Optional
 
 from .config import settings
-from .models import StudentInfo, TopicInfo, InteractionStartResult, InteractionResult, Topic
+from .models import StudentInfo, TopicInfo, InteractionStartResult, InteractionResult, Topic, MSEResult, TutoringResult
 
 
 BASE_URL = settings.KNOWUNITY_API_URL
@@ -121,7 +121,7 @@ async def submit_mse_predictions(
     session: aiohttp.ClientSession,
     predictions_dict: dict,
     set_type: str = "mini_dev"
-):
+)-> MSEResult:
     """
     Submit level predictions for MSE evaluation.
     
@@ -143,20 +143,22 @@ async def submit_mse_predictions(
     
     async with session.post(url, json=payload, headers=_get_headers(with_api_key=True)) as response:
         response.raise_for_status()
-        return await response.json()
+        data = await response.json()
+        return MSEResult(**data)
 
 
 async def evaluate_tutoring(
     session: aiohttp.ClientSession,
     set_type: str = "mini_dev"
-):
+)-> TutoringResult:
     """Evaluate tutoring quality."""
     url = f"{BASE_URL}/evaluate/tutoring"
     payload = {"set_type": set_type}
     
     async with session.post(url, json=payload, headers=_get_headers(with_api_key=True)) as response:
         response.raise_for_status()
-        return await response.json()
+        data = await response.json()
+        return TutoringResult(**data)
 
 
 def create_session() -> aiohttp.ClientSession:
