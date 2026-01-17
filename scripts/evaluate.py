@@ -8,7 +8,7 @@ from fbdsm.orchestrator import run_quick_test
 
 def evaluate(
     dataset: str = "mini_dev",
-    max_turns: int = 10,
+    max_turns: int = 3,
     max_concurrent: int = 3,
     submit: bool = True,
     output: str = None,

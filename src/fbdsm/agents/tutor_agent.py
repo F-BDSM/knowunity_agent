@@ -1,11 +1,12 @@
 from typing import Optional, List, Tuple
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
+from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai.messages import ModelMessage
 from enum import StrEnum
 
 from ..models import TutorAgentInput
 from ..config import settings
+from .base import Agent
 from .response_analyzer import ResponseAnalysis, Correctness
 
 
@@ -33,7 +34,7 @@ class TutorOutput(BaseModel):
 
 
 # Create the pydantic-ai agent
-_tutor_agent = Agent(
+_tutor_agent = PydanticAgent(
     settings.MODEL_NAME,
     output_type=TutorOutput,
     instructions=(
@@ -58,11 +59,12 @@ _tutor_agent = Agent(
 )
 
 
-class TutorAgent:
+class TutorAgent(Agent):
     """Adaptive tutoring agent that generates personalized tutoring content."""
 
     def __init__(self):
-        self.agent = _tutor_agent
+        super().__init__()
+        self._pydantic_agent = _tutor_agent
         self._message_history: List[ModelMessage] = []
 
     def _build_prompt(self, request: TutorAgentInput) -> str:
@@ -131,11 +133,11 @@ class TutorAgent:
 
         return "\n".join(prompt_parts)
 
-    async def generate(self, request: TutorAgentInput) -> Tuple[str, QuestionDifficulty]:
+    async def run(self, request: TutorAgentInput) -> Tuple[str, QuestionDifficulty]:
         """Generate a tutoring response."""
         prompt = self._build_prompt(request)
 
-        result = await self.agent.run(
+        result = await self._pydantic_agent.run(
             prompt,
             message_history=self._message_history,
         )
@@ -144,7 +146,6 @@ class TutorAgent:
         self._message_history = result.new_messages()
 
         output = result.output
-        # Return the full message (or question if specified) and difficulty
         return output.message, output.difficulty
 
     def reset_history(self):

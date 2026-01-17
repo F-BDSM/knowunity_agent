@@ -1,9 +1,10 @@
 from typing import List
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
+from pydantic_ai import Agent as PydanticAgent
 from enum import StrEnum
 
 from ..config import settings
+from .base import Agent
 
 
 class Score(StrEnum):
@@ -30,7 +31,7 @@ class ScoringOutput(BaseModel):
 
 
 # Create the pydantic-ai agent
-_scoring_agent = Agent(
+_scoring_agent = PydanticAgent(
     settings.MODEL_NAME,
     output_type=ScoringOutput,
     instructions=(
@@ -41,11 +42,12 @@ _scoring_agent = Agent(
 )
 
 
-class ScoringAgent:
-    """Wrapper class for backward compatibility with orchestrator."""
+class ScoringAgent(Agent):
+    """Agent for final scoring of student understanding."""
 
     def __init__(self):
-        self.agent = _scoring_agent
+        super().__init__()
+        self._pydantic_agent = _scoring_agent
 
     def _build_prompt(self, conversation: List[dict]) -> str:
         """Build the prompt from the conversation Q&A pairs."""
@@ -61,8 +63,8 @@ class ScoringAgent:
         
         return "\n".join(prompt_parts)
 
-    async def generate(self, conversation: List[dict]) -> int:
+    async def run(self, conversation: List[dict]) -> int:
         """Generate a score for the conversation."""
         prompt = self._build_prompt(conversation)
-        result = await self.agent.run(prompt)
+        result = await self._pydantic_agent.run(prompt)
         return MAPPING[result.output.score]

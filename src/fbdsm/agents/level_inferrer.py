@@ -1,8 +1,9 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
+from pydantic_ai import Agent as PydanticAgent
 
 from ..config import settings
+from .base import Agent
 from .response_analyzer import ResponseAnalysis, Correctness
 
 
@@ -22,7 +23,7 @@ class LevelEstimate(BaseModel):
 
 
 # Create the pydantic-ai agent
-_level_inferrer = Agent(
+_level_inferrer = PydanticAgent(
     settings.MODEL_NAME,
     output_type=LevelEstimate,
     instructions=(
@@ -39,11 +40,12 @@ _level_inferrer = Agent(
 )
 
 
-class LevelInferrer:
+class LevelInferrer(Agent):
     """Agent that infers student skill level based on conversation history."""
 
     def __init__(self):
-        self.agent = _level_inferrer
+        super().__init__()
+        self._pydantic_agent = _level_inferrer
 
     def _build_prompt(
         self,
@@ -82,7 +84,7 @@ class LevelInferrer:
 
         return "\n".join(prompt_parts)
 
-    async def infer(
+    async def run(
         self,
         topic_name: str,
         grade_level: int,
@@ -96,5 +98,5 @@ class LevelInferrer:
             conversation_history=conversation_history,
             current_estimate=current_estimate,
         )
-        result = await self.agent.run(prompt)
+        result = await self._pydantic_agent.run(prompt)
         return result.output

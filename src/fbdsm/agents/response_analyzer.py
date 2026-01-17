@@ -1,9 +1,10 @@
 from typing import List
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
+from pydantic_ai import Agent as PydanticAgent
 from enum import StrEnum
 
 from ..config import settings
+from .base import Agent
 
 
 class Correctness(StrEnum):
@@ -35,7 +36,7 @@ class ResponseAnalysis(BaseModel):
 
 
 # Create the pydantic-ai agent
-_response_analyzer = Agent(
+_response_analyzer = PydanticAgent(
     settings.MODEL_NAME,
     output_type=ResponseAnalysis,
     instructions=(
@@ -47,11 +48,12 @@ _response_analyzer = Agent(
 )
 
 
-class ResponseAnalyzer:
+class ResponseAnalyzer(Agent):
     """Agent that analyzes student responses to identify correctness and knowledge gaps."""
 
     def __init__(self):
-        self.agent = _response_analyzer
+        super().__init__()
+        self._pydantic_agent = _response_analyzer
 
     def _build_prompt(
         self,
@@ -74,7 +76,7 @@ Student's Response: {student_response}
 
 Evaluate the correctness of the response and identify any knowledge gaps or strengths."""
 
-    async def analyze(
+    async def run(
         self,
         question: str,
         student_response: str,
@@ -90,5 +92,5 @@ Evaluate the correctness of the response and identify any knowledge gaps or stre
             topic_name=topic_name,
             grade_level=grade_level,
         )
-        result = await self.agent.run(prompt)
+        result = await self._pydantic_agent.run(prompt)
         return result.output

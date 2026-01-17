@@ -53,6 +53,8 @@ class TutoringOrchestrator:
         last_response_analysis = None
         current_level_estimate: int = 3  # Start with "at-grade" assumption
         level_confidence: float = 0.0  # Start with no confidence
+        level_estimates = []
+        level_estimates_confidences = []
 
         for i in tqdm(range(self.max_turns), desc="Running tutoring session"):
             # 1. Generate adaptive tutor response
@@ -68,7 +70,7 @@ class TutoringOrchestrator:
                 previous_question_difficulty=last_question_difficulty,
                 previous_response_analysis=last_response_analysis,
             )
-            tutor_message, question_difficulty = await self.tutor_agent.generate(request=tutor_input)
+            tutor_message, question_difficulty = await self.tutor_agent.run(request=tutor_input)
 
             # 2. Send message to student and get response
             result = await self.student.get_response(session, tutor_message)
@@ -77,7 +79,7 @@ class TutoringOrchestrator:
             last_question_difficulty = question_difficulty
 
             # 3. Analyze the student's response
-            response_analysis = await self.response_analyzer.analyze(
+            response_analysis = await self.response_analyzer.run(
                 question=tutor_message,
                 student_response=last_student_response,
                 question_difficulty=str(question_difficulty),
@@ -103,7 +105,7 @@ class TutoringOrchestrator:
 
             # 5. Update level estimate (after first turn)
             if len(self.q_a_pairs) >= 1:
-                level_estimate = await self.level_inferrer.infer(
+                level_estimate = await self.level_inferrer.run(
                     topic_name=topic.name,
                     grade_level=topic.grade_level,
                     conversation_history=self.q_a_pairs,
@@ -111,16 +113,21 @@ class TutoringOrchestrator:
                 )
                 current_level_estimate = level_estimate.estimated_level
                 level_confidence = level_estimate.confidence
+                level_estimates.append(level_estimate.estimated_level)
+                level_estimates_confidences.append(level_estimate.confidence)
 
         # 6. Final verification with scoring agent
-        scoring_level = await self.scoring_agent.generate(conversation=self.q_a_pairs)
+        scoring_level = await self.scoring_agent.run(conversation=self.q_a_pairs)
         
         # Average the two predictions and round to nearest integer
         # Weight by level_inferrer confidence (higher confidence = more weight to inferrer)
-        inferrer_weight = 0.5 + (level_confidence * 0.3)  # Range: 0.5 to 0.8
+        avg_confidence = sum(level_estimates_confidences) / len(level_estimates_confidences)
+        inferrer_weight = 0.5 + (avg_confidence * 0.3)  # Range: 0.5 to 0.8
         scorer_weight = 1.0 - inferrer_weight
         
-        weighted_average = (current_level_estimate * inferrer_weight) + (scoring_level * scorer_weight)
+        # Average the level estimates from the level_inferrer
+        estimated_level = sum(level_estimates) / len(level_estimates)
+        weighted_average = (estimated_level * inferrer_weight) + (scoring_level * scorer_weight)
         final_level = round(weighted_average)
         
         # Clamp to valid range
@@ -163,7 +170,7 @@ async def run_quick_test(student_id: Optional[str] = None, topic_id: Optional[st
         if not student_id:
             student_id = students[0].id
         
-        orchestrator = TutoringOrchestrator(student_id)
+        orchestrator = TutoringOrchestrator(student_id,max_turns=3)
         topics = await orchestrator.get_all_topics(session)
         
         if not topic_id:
