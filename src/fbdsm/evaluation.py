@@ -164,7 +164,7 @@ class Evaluator:
 
             try:
                 pathlib.Path("eval_results").mkdir(exist_ok=True)
-                result.save(f"eval_results/{self.dataset}_{datetime.now().isoformat()}.json")
+                result.save(f"eval_results/{self.dataset}_{datetime.now()}.json".replace(":", "_"))
             except Exception as e:
                 print(f"Error saving result: {e}")
             

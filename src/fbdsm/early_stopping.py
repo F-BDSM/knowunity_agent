@@ -7,7 +7,6 @@ from enum import StrEnum
 class StopReason(StrEnum):
     """Reasons for early termination of a tutoring session."""
     LEVEL_PLATEAU = "level_plateau"
-    TUTOR_SIGNAL = "tutor_signal"
     HIGH_CONFIDENCE = "high_confidence"
     MAX_TURNS_REACHED = "max_turns_reached"
 
@@ -52,17 +51,15 @@ class EarlyStopping:
         level_stability_count: int,
         level_confidence: float,
         current_level_estimate: int,
-        tutor_signaled_conclude: bool,
     ) -> StopDecision:
         """
-        Check if the session should terminate early.
+        Check if the session should terminate early based on statistics.
         
         Args:
             turn: Current turn number (1-indexed)
             level_stability_count: Number of consecutive turns with same level estimate
             level_confidence: Current confidence in level estimate (0-1)
             current_level_estimate: Current estimated level (1-5)
-            tutor_signaled_conclude: Whether the tutor agent signaled to conclude
             
         Returns:
             StopDecision with should_stop flag and reason if stopping
@@ -77,14 +74,6 @@ class EarlyStopping:
                 should_stop=True,
                 reason=StopReason.LEVEL_PLATEAU,
                 message=f"Level plateau detected ({current_level_estimate}/5 stable for {level_stability_count} turns) at turn {turn}"
-            )
-        
-        # Secondary: Tutor agent signals high confidence conclusion
-        if tutor_signaled_conclude:
-            return StopDecision(
-                should_stop=True,
-                reason=StopReason.TUTOR_SIGNAL,
-                message=f"Tutor signaled conclusion at turn {turn}"
             )
         
         # Tertiary: High confidence + some stability

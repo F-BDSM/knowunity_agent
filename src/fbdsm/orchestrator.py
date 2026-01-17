@@ -110,7 +110,7 @@ class TutoringOrchestrator:
                 previous_response_analysis=last_response_analysis,
                 assessment_stats=assessment_stats,
             )
-            tutor_message, question_difficulty, should_conclude = await self.tutor_agent.run(request=tutor_input)
+            tutor_message, question_difficulty = await self.tutor_agent.run(request=tutor_input)
             
             # Update difficulty counts
             diff_key = str(question_difficulty).lower()
@@ -193,7 +193,6 @@ class TutoringOrchestrator:
                 level_stability_count=level_stability_count,
                 level_confidence=level_confidence,
                 current_level_estimate=current_level_estimate,
-                tutor_signaled_conclude=should_conclude,
             )
             
             if stop_decision.should_stop:

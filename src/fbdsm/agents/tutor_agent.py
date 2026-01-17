@@ -33,10 +33,6 @@ class TutorOutput(BaseModel):
     difficulty: QuestionDifficulty = Field(
         description="The difficulty level of any question or content being presented"
     )
-    should_conclude: bool = Field(
-        default=False,
-        description="Set to True if the assessment should end early"
-    )
     # Metadata from sub-agents for observability
     strategy: Optional[QuestionStrategy] = Field(
         default=None,
@@ -68,34 +64,12 @@ class TutorAgent(Agent):
         """Not used - each sub-agent has its own prompt building."""
         raise NotImplementedError("TutorAgent uses sub-agents, not direct prompts")
 
-    def _should_conclude(self, request: TutorAgentInput) -> bool:
-        """
-        Determine if the assessment should conclude early.
-        
-        Delegates to the EarlyStopping logic in the orchestrator,
-        but provides a hint here based on assessment stats.
-        """
-        if not request.assessment_stats:
-            return False
-        
-        stats = request.assessment_stats
-        
-        # High confidence + stability → conclude
-        if request.level_confidence >= 0.85 and stats.level_stability >= 2:
-            return True
-        
-        # Clear plateau → conclude
-        if stats.level_stability >= 3:
-            return True
-        
-        return False
-
-    async def run(self, request: TutorAgentInput) -> Tuple[str, QuestionDifficulty, bool]:
+    async def run(self, request: TutorAgentInput) -> Tuple[str, QuestionDifficulty]:
         """
         Generate a tutoring response by orchestrating sub-agents.
         
         Returns:
-            Tuple of (message, difficulty, should_conclude)
+            Tuple of (message, difficulty)
         """
         # Extract context from request
         previous_correctness = None
@@ -142,9 +116,6 @@ class TutorAgent(Agent):
             knowledge_gaps=knowledge_gaps,
         )
 
-        # Step 4: Determine if we should conclude
-        should_conclude = self._should_conclude(request)
-
         # Store turn for history (for potential future context)
         self._message_history.append({
             "turn": request.current_turn,
@@ -153,7 +124,7 @@ class TutorAgent(Agent):
             "message_type": composed.message_type,
         })
 
-        return composed.message, difficulty_rec.difficulty, should_conclude
+        return composed.message, difficulty_rec.difficulty
 
     def reset_history(self):
         """Reset the message history for a new session."""
